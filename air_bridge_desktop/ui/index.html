@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <style>
+    body { font-family: system-ui, "Microsoft YaHei", sans-serif; padding: 20px; background: #f2f2f7; color: #333; user-select: none; }
+    .container { max-width: 500px; margin: 0 auto; }
+    
+    .status-card { background: white; padding: 20px; border-radius: 16px; text-align: center; box-shadow: 0 4px 12px rgba(0,0,0,0.05); margin-bottom: 20px; }
+    .status-title { font-size: 18px; font-weight: bold; margin-bottom: 10px; color: #888; }
+    .status-url { font-size: 18px; font-weight: 900; color: #007bff; word-break: break-all; margin-top: 15px; cursor: pointer; text-decoration: underline; }
+    
+    /* 警告栏样式 */
+    .warning-box { color: #d32f2f; background: #ffebee; padding: 8px; border-radius: 6px; font-size: 12px; margin-top: 10px; display: none; }
+
+    .qr-box { margin: 10px auto; padding: 10px; background: white; display: inline-block; }
+    .qr-img { width: 160px; height: 160px; image-rendering: pixelated; }
+    
+    .copy-link-btn {
+        background: #f0f7ff; color: #007bff; border: 1px dashed #007bff;
+        padding: 10px 15px; border-radius: 8px; font-size: 14px; font-weight: 600;
+        cursor: pointer; margin-top: 5px; width: 100%; box-sizing: border-box;
+    }
+    .copy-link-btn:active { background: #e0efff; }
+
+    .settings-row { display: flex; justify-content: space-between; margin-bottom: 10px; background: white; padding: 12px 15px; border-radius: 8px; font-size: 14px; align-items: center; }
+    .settings-text { color: #555; font-weight: 500; }
+    
+    .btn-row { display: flex; gap: 10px; margin-bottom: 20px; margin-top: 20px; }
+    .btn { flex: 1; border: none; padding: 12px; border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer; transition: 0.2s; }
+    .btn-primary { background: white; color: #007bff; border: 1px solid #007bff; }
+    .btn-primary:hover { background: #eef6ff; }
+    .btn-action { background: #007bff; color: white; }
+    .btn-stop { background: #fff0f0; color: #d32f2f; border: 1px solid #ffcdd2; }
+    
+    .breadcrumbs { padding: 10px 5px; color: #666; font-size: 14px; margin-bottom: 5px; display: none; }
+    .crumb { color: #007bff; cursor: pointer; text-decoration: underline; margin: 0 5px; }
+    .crumb:last-child { color: #333; text-decoration: none; cursor: default; }
+
+    .file-item { background: white; padding: 12px; margin-bottom: 8px; border-radius: 8px; display: flex; align-items: center; justify-content: space-between; transition: 0.2s; }
+    .file-item.folder:hover { background: #f8f9fa; cursor: pointer; }
+    .file-info { display: flex; align-items: center; overflow: hidden; }
+    .file-icon { font-size: 24px; margin-right: 12px; }
+    .file-name { font-weight: 500; font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 220px; }
+    .file-size { font-size: 12px; color: #999; }
+    .btn-del { border: none; background: transparent; color: #ff4d4f; font-size: 18px; cursor: pointer; padding: 5px 10px; }
+    .btn-del:hover { background: #fff1f0; border-radius: 4px; }
+    
+    .footer-link { text-align: center; margin-top: 30px; font-size: 12px; color: #999; cursor: pointer; text-decoration: underline; }
+
+    .modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); display: none; align-items: center; justify-content: center; z-index: 999; }
+    .modal-content { background: white; padding: 20px; border-radius: 12px; width: 300px; text-align: center; }
+    .active .status-card { border: 2px solid #007bff; background: #f0f7ff; }
+  </style>
+</head>
+<body>
+  <div class="container" id="app">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+        <h2 style="margin:0;color:#333">AirBridge PC</h2>
+        <button style="border:none; background:none; cursor:pointer; font-size:14px; color:#555;" onclick="showAbout()">ℹ️ 关于</button>
+    </div>
+
+    <div class="status-card" id="statusCard">
+      <div class="status-title" id="statusText">等待启动</div>
+      <div id="qrContainer" style="display: none;">
+        <div class="qr-box"><img id="qrImg" class="qr-img" src="" /></div>
+        <button class="copy-link-btn" onclick="copyLink()">📋 扫描二维码 或 点击复制分享链接</button>
+        <div class="status-url" id="serverUrl" onclick="copyLink()">---</div>
+        <!-- 警告栏 -->
+        <div id="ipv6Warning" class="warning-box"></div>
+      </div>
+    </div>
+
+    <div class="settings-row">
+      <span class="settings-text">使用 4 位短口令</span>
+      <input type="checkbox" id="chkShort" onchange="updateConfig()">
+    </div>
+    <div class="settings-row">
+      <div style="display:flex; flex-direction:column;">
+        <span class="settings-text">尝试 IPv6 传输</span>
+        <span style="font-size:10px; color:#999;">默认关闭，仅限公网传输</span>
+      </div>
+      <input type="checkbox" id="chkIPv6" onchange="updateConfig()">
+    </div>
+    <div class="settings-row">
+      <span class="settings-text">显示隐藏文件 (.开头)</span>
+      <input type="checkbox" id="chkHidden" onchange="updateConfig()">
+    </div>
+
+    <div class="btn-row">
+      <button class="btn btn-primary" onclick="pickFiles()">📄 传文件</button>
+      <button class="btn btn-primary" onclick="pickFolder()">📂 传文件夹</button>
+      <button class="btn btn-action" id="toggleBtn" onclick="toggleServer()">🚀 启动服务</button>
+    </div>
+
+    <div id="breadcrumbs" class="breadcrumbs"></div>
+    <div class="list-header" style="color:#666;font-size:14px;margin-bottom:10px;">已选列表:</div>
+    <div id="fileList"></div>
+    
+    <div class="footer-link" onclick="fixFirewall()">无法连接？点击一键修复防火墙规则</div>
+  </div>
+
+  <div id="aboutModal" class="modal">
+    <div class="modal-content">
+      <h3>关于 AirBridge</h3>
+      <p>版本：0.1.0 (PC)</p>
+      <p style="color: purple; font-weight: bold;">作者：b站up主 道系青年Lee</p>
+      <button class="btn btn-primary" onclick="closeAbout()">支持作者</button>
+    </div>
+  </div>
+
+  <script>
+    const { invoke } = window.__TAURI__.tauri;
+    let rootItems = [];
+    let navStackIds = []; 
+
+    async function refreshState() {
+      const state = await invoke('get_state');
+      
+      document.getElementById('chkShort').checked = state.short_token;
+      document.getElementById('chkIPv6').checked = state.use_ipv6;
+      document.getElementById('chkHidden').checked = state.show_hidden;
+
+      const qrDiv = document.getElementById('qrContainer');
+      const btn = document.getElementById('toggleBtn');
+      const warningDiv = document.getElementById('ipv6Warning');
+      
+      if (state.is_serving) {
+        document.body.className = 'active';
+        document.getElementById('statusText').innerText = '正在分享中';
+        document.getElementById('statusText').style.color = '#007bff';
+        document.getElementById('serverUrl').innerText = state.url;
+        document.getElementById('qrImg').src = 'data:image/png;base64,' + state.qr_base64;
+        qrDiv.style.display = 'block';
+        btn.innerText = '⏹ 停止服务';
+        btn.className = 'btn btn-stop';
+        document.getElementById('chkShort').disabled = true;
+        document.getElementById('chkIPv6').disabled = true;
+        document.getElementById('chkHidden').disabled = true;
+        
+        // 显示或隐藏警告
+        if (state.ipv6_warning) {
+            warningDiv.innerText = state.ipv6_warning;
+            warningDiv.style.display = 'block';
+        } else {
+            warningDiv.style.display = 'none';
+        }
+      } else {
+        document.body.className = '';
+        document.getElementById('statusText').innerText = '服务已停止';
+        document.getElementById('serverUrl').innerText = '---';
+        qrDiv.style.display = 'none';
+        btn.innerText = '🚀 启动分享';
+        btn.className = 'btn btn-action';
+        document.getElementById('chkShort').disabled = false;
+        document.getElementById('chkIPv6').disabled = false;
+        document.getElementById('chkHidden').disabled = false;
+      }
+
+      rootItems = state.items;
+      retracePath();
+      renderList();
+    }
+
+    function findFolderById(items, id) {
+        for (let item of items) {
+            if (item.id === id) return item;
+            if (item.type === 'folder') {
+                let found = findFolderById(item.children, id);
+                if (found) return found;
+            }
+        }
+        return null;
+    }
+
+    function retracePath() {
+        let validStack = [];
+        for (let id of navStackIds) {
+            let found = findFolderById(rootItems, id);
+            if (found) {
+                validStack.push(found);
+            } else {
+                break;
+            }
+        }
+        navStackObj = validStack; 
+        if (validStack.length < navStackIds.length) {
+            navStackIds = validStack.map(f => f.id);
+        }
+    }
+    
+    let navStackObj = [];
+
+    function renderList() {
+        const listDiv = document.getElementById('fileList');
+        const breadDiv = document.getElementById('breadcrumbs');
+        let currentItems = rootItems;
+        if (navStackObj.length > 0) {
+            currentItems = navStackObj[navStackObj.length - 1].children;
+            breadDiv.style.display = 'block';
+            renderBread();
+        } else {
+            breadDiv.style.display = 'none';
+        }
+
+        listDiv.innerHTML = '';
+        if (!currentItems || currentItems.length === 0) {
+            listDiv.innerHTML = '<div style="text-align:center;color:#ccc;padding:20px;">暂无文件</div>';
+            return;
+        }
+
+        currentItems.forEach((item) => {
+            const div = document.createElement('div');
+            const isFolder = item.type === 'folder';
+            div.className = isFolder ? 'file-item folder' : 'file-item';
+            let icon = isFolder ? '📂' : '📄';
+            let info = isFolder ? (item.children ? item.children.length + ' 项' : '0 项') : (item.size/1024/1024).toFixed(2) + ' MB';
+            
+            div.innerHTML = `
+                <div class="file-info">
+                    <span class="file-icon">${icon}</span>
+                    <div>
+                        <div class="file-name">${item.name}</div>
+                        <div class="file-size">${info}</div>
+                    </div>
+                </div>
+                <button class="btn-del" onclick="deleteItem('${item.id}', event)">×</button>
+            `;
+            if (isFolder) div.onclick = () => enterFolder(item);
+            listDiv.appendChild(div);
+        });
+    }
+
+    function renderBread() {
+        const el = document.getElementById('breadcrumbs');
+        let html = `<span class="crumb" onclick="goRoot()">首页</span>`;
+        navStackObj.forEach((folder, idx) => {
+            html += ` > <span class="crumb" onclick="goLevel(${idx})">${folder.name}</span>`;
+        });
+        el.innerHTML = html;
+    }
+
+    function enterFolder(folder) { navStackIds.push(folder.id); refreshState(); }
+    function goRoot() { navStackIds = []; refreshState(); }
+    function goLevel(idx) { navStackIds = navStackIds.slice(0, idx + 1); refreshState(); }
+
+    async function deleteItem(id, event) {
+        event.stopPropagation();
+        await invoke('remove_item', { id });
+        refreshState();
+    }
+
+    async function pickFiles() { await invoke('pick_files'); refreshState(); }
+    async function pickFolder() { await invoke('pick_folder'); refreshState(); }
+    async function toggleServer() { await invoke('toggle_server'); refreshState(); }
+    
+    async function updateConfig() {
+        const short = document.getElementById('chkShort').checked;
+        const ipv6 = document.getElementById('chkIPv6').checked;
+        const hidden = document.getElementById('chkHidden').checked;
+        await invoke('set_config', { shortToken: short, ipv6: ipv6, showHidden: hidden });
+        refreshState();
+    }
+
+    async function fixFirewall() {
+        if(confirm("即将申请管理员权限，自动添加名为 [AirBridge] 的入站规则，是否继续？")) {
+            await invoke('fix_firewall');
+        }
+    }
+
+    function showAbout() { document.getElementById('aboutModal').style.display = 'flex'; }
+    function closeAbout() { document.getElementById('aboutModal').style.display = 'none'; }
+    
+    async function copyLink() {
+        const url = document.getElementById('serverUrl').innerText;
+        if(url !== '---') {
+            navigator.clipboard.writeText(url).then(() => alert('链接已复制，发给手机吧！'));
+        }
+    }
+
+    refreshState();
+    setInterval(refreshState, 1000); 
+  </script>
+</body>
+</html>

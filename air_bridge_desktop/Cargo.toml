@@ -1,0 +1,41 @@
+[package]
+name = "air_bridge_desktop"
+version = "0.1.0"
+edition = "2021"
+# 这里很重要：为了减小体积，我们要剥离符号表
+build = "build.rs"
+
+[dependencies]
+# --- Web Server (复刻 server.dart 的功能) ---
+axum = { version = "0.7", features = ["multipart"] }
+tokio = { version = "1", features = ["full"] }          # 异步运行时
+tower-http = { version = "0.5", features = ["cors", "fs"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+# --- 系统能力 ---
+local-ip-address = "0.6"  # 获取本机 IP
+rfd = "0.14"              # 文件选择对话框 (Rust File Dialog)
+open = "5.0"              # 打开浏览器/文件夹
+
+# --- 工具 ---
+rand = "0.8"
+qrcode = { version = "0.13", default-features = false, features = ["image"] }          # 生成二维码
+base64 = "0.22"
+image = "0.24"            # 处理二维码图片
+zip = "0.6"                  # 压缩库 (对应 Dart 的 archive)
+walkdir = "2"              # 递归压缩文件夹
+socket2 = "0.5"         # 专门用来处理双栈绑定的神器
+if-addrs = "0.10"       # 新增：用于精准获取网络接口信息
+
+# --- Tauri 核心 ---
+tauri = { version = "1.6", features = [ "shell-all", "dialog-all", "custom-protocol" ] }
+
+[build-dependencies]
+tauri-build = { version = "1.5", features = [] }
+
+[profile.release]
+lto = true        # 开启链接时优化 (体积更小)
+codegen-units = 1 # 牺牲编译速度换取体积和性能
+strip = true      # 移除调试符号 (大幅减小体积)
+panic = "abort"   # 崩溃直接退出，减小体积
